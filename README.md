@@ -77,6 +77,10 @@ impl Encoder for MyCustomEncoder {
 }
 ```
 
+## Alternatives
+
+- [bevy_image_export](https://github.com/paulkre/bevy_image_export): Less opinionated, no encoders included, only image sequences. This might be a better fit, if you end up using ffmpeg on the frames anyway.
+
 ## License
 
 Licensed under either of
