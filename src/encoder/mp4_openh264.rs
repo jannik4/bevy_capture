@@ -77,11 +77,23 @@ impl<W: Write + Seek> Encoder for Mp4Openh264Encoder<W> {
                 media_conf: MediaConfig::AvcConfig(AvcConfig {
                     width: self.width,
                     height: self.height,
-                    seq_param_set: layer_0.nal_unit(0).unwrap()[4..].to_vec(),
-                    pic_param_set: layer_0.nal_unit(1).unwrap()[4..].to_vec(),
+                    seq_param_set: remove_nal_start_code(layer_0.nal_unit(0).unwrap()).to_vec(),
+                    pic_param_set: remove_nal_start_code(layer_0.nal_unit(1).unwrap()).to_vec(),
                 }),
             })?;
             self.mp4_track_added = true;
+        }
+
+        let mut bytes = Vec::new();
+        for l in 0..bitstream.num_layers() {
+            let layer = bitstream.layer(l).unwrap();
+            if layer.is_video() {
+                for n in 0..layer.nal_count() {
+                    let nal = remove_nal_start_code(layer.nal_unit(n).unwrap());
+                    bytes.extend_from_slice(&u32::to_be_bytes(nal.len() as u32));
+                    bytes.extend_from_slice(nal);
+                }
+            }
         }
 
         self.mp4.write_sample(
@@ -91,7 +103,7 @@ impl<W: Write + Seek> Encoder for Mp4Openh264Encoder<W> {
                 duration: 100,
                 rendering_offset: 0,
                 is_sync: matches!(bitstream.frame_type(), FrameType::I | FrameType::IDR),
-                bytes: bitstream.to_vec().into(),
+                bytes: bytes.into(),
             },
         )?;
 
@@ -116,5 +128,15 @@ impl RGBSource for ImageSource {
     fn pixel_f32(&self, x: usize, y: usize) -> (f32, f32, f32) {
         let [r, g, b, _] = self.0.get_pixel(x as u32, y as u32).0;
         (r as f32, g as f32, b as f32)
+    }
+}
+
+fn remove_nal_start_code(nal: &[u8]) -> &[u8] {
+    if nal.starts_with(&[0, 0, 0, 1]) {
+        &nal[4..]
+    } else if nal.starts_with(&[0, 0, 1]) {
+        &nal[3..]
+    } else {
+        nal
     }
 }
