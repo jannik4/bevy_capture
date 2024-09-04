@@ -8,8 +8,6 @@ A Bevy plugin for capturing frames from a Bevy application. It comes with some b
 ## Current Limitations
 
 - Only headless rendering is supported, but windowed rendering should be possible as well. PRs are welcome!
-- There isn't a built-in method to determine when everything is ready (such as assets loaded and pipelines built).
-  The best approach is to wait a few frames before starting the capture.
 
 ## Built-in Encoders
 
@@ -27,8 +25,15 @@ For a complete example, see the [simple example](https://github.com/jannik4/bevy
 ```rust,ignore
 // Add plugins
 app.add_plugins((
-    // Disable the WinitPlugin to prevent the creation of a window
-    DefaultPlugins.build().disable::<WinitPlugin>(),
+    DefaultPlugins
+        .build()
+        // Disable the WinitPlugin to prevent the creation of a window
+        .disable::<WinitPlugin>()
+        // Make sure pipelines are ready before rendering
+        .set(RenderPlugin {
+            synchronous_pipeline_compilation: true,
+            ..default()
+        }),
     // Add the ScheduleRunnerPlugin to run the app in loop mode
     ScheduleRunnerPlugin {
         run_mode: RunMode::Loop { wait: None },

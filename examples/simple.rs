@@ -1,6 +1,7 @@
 use bevy::{
     app::{RunMode, ScheduleRunnerPlugin},
     prelude::*,
+    render::RenderPlugin,
     sprite::MaterialMesh2dBundle,
     time::TimeUpdateStrategy,
     winit::WinitPlugin,
@@ -18,8 +19,15 @@ fn main() -> AppExit {
     let mut app = App::new();
 
     app.add_plugins((
-        // Disable the WinitPlugin to prevent the creation of a window
-        DefaultPlugins.build().disable::<WinitPlugin>(),
+        DefaultPlugins
+            .build()
+            // Disable the WinitPlugin to prevent the creation of a window
+            .disable::<WinitPlugin>()
+            // Make sure pipelines are ready before rendering
+            .set(RenderPlugin {
+                synchronous_pipeline_compilation: true,
+                ..default()
+            }),
         // Add the ScheduleRunnerPlugin to run the app in loop mode
         ScheduleRunnerPlugin {
             run_mode: RunMode::Loop { wait: None },
@@ -72,14 +80,7 @@ fn update(
     mut capture: Query<&mut Capture>,
     mut cubes: Query<&mut Transform, With<Cube>>,
     mut frame: Local<u32>,
-
-    time: Res<Time>,
 ) {
-    // Wait for some frames to make sure the app is fully initialized
-    if time.elapsed() < Duration::from_secs(1) {
-        return;
-    }
-
     let mut capture = capture.single_mut();
     if !capture.is_capturing() {
         capture.start((
