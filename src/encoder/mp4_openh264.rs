@@ -34,7 +34,7 @@ impl<W: Write + Seek> Mp4Openh264Encoder<W> {
     /// Creates a new MP4 encoder that writes the MP4 to the given writer, e.g. a file.
     /// The width and height of the video should match the dimensions of the images.
     pub fn new(writer: W, width: u16, height: u16) -> Result<Self> {
-        Self::new_with_config(writer, width, height, Default::default())
+        Self::new_with_config(writer, width, height, EncoderConfig::new())
     }
 
     /// Creates a new MP4 encoder that writes the MP4 to the given writer, e.g. a file.
