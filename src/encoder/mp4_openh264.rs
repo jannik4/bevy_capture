@@ -7,9 +7,9 @@ use mp4::{
     AvcConfig, FourCC, MediaConfig, Mp4Config, Mp4Sample, Mp4Writer, TrackConfig, TrackType,
 };
 use openh264::{
-    encoder::FrameType,
+    encoder::{EncoderConfig, FrameType},
     formats::{RGBSource, YUVBuffer},
-    Timestamp,
+    OpenH264API, Timestamp,
 };
 use std::{
     io::{Seek, Write},
@@ -17,6 +17,8 @@ use std::{
 };
 
 type Openh264Encoder = openh264::encoder::Encoder;
+
+pub use openh264;
 
 /// An encoder that encodes a sequence of images into an MP4 file using OpenH264.
 pub struct Mp4Openh264Encoder<W> {
@@ -32,6 +34,18 @@ impl<W: Write + Seek> Mp4Openh264Encoder<W> {
     /// Creates a new MP4 encoder that writes the MP4 to the given writer, e.g. a file.
     /// The width and height of the video should match the dimensions of the images.
     pub fn new(writer: W, width: u16, height: u16) -> Result<Self> {
+        Self::new_with_config(writer, width, height, Default::default())
+    }
+
+    /// Creates a new MP4 encoder that writes the MP4 to the given writer, e.g. a file.
+    /// The width and height of the video should match the dimensions of the images.
+    /// The encoder configuration can be used to set the desired quality and other parameters.
+    pub fn new_with_config(
+        writer: W,
+        width: u16,
+        height: u16,
+        config: EncoderConfig,
+    ) -> Result<Self> {
         let mp4 = Mp4Writer::write_start(
             writer,
             &Mp4Config {
@@ -50,7 +64,7 @@ impl<W: Write + Seek> Mp4Openh264Encoder<W> {
         Ok(Self {
             mp4,
             mp4_track_added: false,
-            openh264: Openh264Encoder::new()?,
+            openh264: Openh264Encoder::with_api_config(OpenH264API::from_source(), config)?,
             frame: 0,
             width,
             height,
