@@ -3,7 +3,7 @@
 use super::{Encoder, Result};
 use bevy::prelude::*;
 use std::{
-    io::Write,
+    io::{BufRead, BufReader, Write},
     path::PathBuf,
     process::{Child, Command, Stdio},
     time::Duration,
@@ -21,7 +21,7 @@ pub struct Mp4FfmpegCliPipeEncoder {
     /// Video configuration
     framerate: u32,
     crf: u32,
-    preset: Option<String>,
+    preset: String,
 
     /// Hardware encoder preference (nvenc, vaapi, etc.)
     hardware_encoder: Option<String>,
@@ -41,7 +41,7 @@ impl Mp4FfmpegCliPipeEncoder {
             path: path.into(),
             framerate: 60,
             crf: 23,
-            preset: Some("fast".to_string()),
+            preset: "fast".to_string(),
             hardware_encoder: None,
             resolution: None,
             finished: false,
@@ -62,7 +62,7 @@ impl Mp4FfmpegCliPipeEncoder {
 
     /// Sets the preset of the video.
     pub fn with_preset(mut self, preset: impl Into<String>) -> Self {
-        self.preset = Some(preset.into());
+        self.preset = preset.into();
         self
     }
 
@@ -121,13 +121,13 @@ impl Mp4FfmpegCliPipeEncoder {
         };
 
         // Preset
-        let preset = self.preset.as_deref().unwrap();
+        let preset = &self.preset;
 
         // Choose encoder
         let encoder = self
             .hardware_encoder
             .clone()
-            .or_else(|| Self::detect_hardware_encoder())
+            .or_else(Self::detect_hardware_encoder)
             .unwrap_or_else(|| "libx264".to_string());
 
         bevy::log::info!("Using encoder: {} for {}x{} video", encoder, width, height);
@@ -188,19 +188,36 @@ impl Mp4FfmpegCliPipeEncoder {
             .stdout(Stdio::null()) // Ignore stdout
             .stderr(Stdio::piped()); // Capture stderr for error messages
 
-        let child = command.spawn()?;
+        let mut child = command.spawn()?;
+        // Drain stderr on a background thread to avoid pipe backpressure.
+        // ffmpeg writes logs to stderr; if the parent never reads them the kernel pipe buffer can fill
+        // and ffmpeg will block on writes, preventing it from exiting.
+        if let Some(stderr) = child.stderr.take() {
+            std::thread::spawn(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    match line {
+                        Ok(l) => bevy::log::info!("ffmpeg: {}", l),
+                        Err(e) => {
+                            bevy::log::warn!("failed reading ffmpeg stderr: {}", e);
+                            break;
+                        }
+                    }
+                }
+            });
+        }
         self.process = Some(child);
 
         Ok(())
     }
 
     /// Converts Bevy Image (RGBA) to raw bytes suitable for ffmpeg
-    fn image_to_raw_bytes(image: &Image) -> Result<Vec<u8>> {
+    fn image_to_raw_bytes(image: &Image) -> Result<&Vec<u8>> {
         // Bevy images are typically in RGBA format
         let image_data = image.data.as_ref().ok_or("Image has no data")?;
 
         // ffmpeg expects raw RGBA bytes
-        Ok(image_data.clone())
+        Ok(image_data)
     }
 
     /// Logs ffmpeg error details from stderr
@@ -230,7 +247,10 @@ impl Mp4FfmpegCliPipeEncoder {
                     Ok(Some(status)) => {
                         // Process finished within timeout
                         if status.success() {
-                            bevy::log::info!("Video encoding completed successfully: {:?}", self.path);
+                            bevy::log::info!(
+                                "Video encoding completed successfully: {:?}",
+                                self.path
+                            );
                         } else {
                             self.log_ffmpeg_error(&mut process, status);
                         }
