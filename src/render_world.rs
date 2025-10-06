@@ -8,12 +8,12 @@ use bevy::{
         render_asset::RenderAssets,
         render_graph::{self, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel},
         render_resource::{
-            Buffer, BufferDescriptor, BufferUsages, Maintain, MapMode, TexelCopyBufferInfo,
+            Buffer, BufferDescriptor, BufferUsages, MapMode, PollType, TexelCopyBufferInfo,
             TexelCopyBufferLayout,
         },
         renderer::{RenderContext, RenderDevice},
         texture::GpuImage,
-        Extract, Render, RenderApp, RenderSet,
+        Extract, Render, RenderApp, RenderSystems,
     },
 };
 
@@ -31,7 +31,7 @@ impl Plugin for CaptureRenderWorldPlugin {
         graph.add_node(ImageCopy, ImageCopyDriver);
         graph.add_node_edge(CameraDriverLabel, ImageCopy);
 
-        render_app.add_systems(Render, encode.after(RenderSet::Render));
+        render_app.add_systems(Render, encode.after(RenderSystems::Render));
     }
 }
 
@@ -225,7 +225,7 @@ fn encode(mut captures: ResMut<Captures>, render_device: Res<RenderDevice>) {
             Ok(r) => s.send(r).expect("Failed to send map update"),
             Err(err) => panic!("Failed to map buffer {err}"),
         });
-        render_device.poll(Maintain::wait()).panic_on_timeout();
+        let _ = render_device.poll(PollType::wait());
         r.recv().expect("Failed to receive the map_async message");
 
         let buffer_bytes = buffer_slice.get_mapped_range().to_vec();
@@ -239,7 +239,8 @@ fn encode(mut captures: ResMut<Captures>, render_device: Res<RenderDevice>) {
                 .target_image
                 .texture_descriptor
                 .format
-                .pixel_size();
+                .pixel_size()
+                .expect("Unsupported texture format");
         let aligned_row_bytes = RenderDevice::align_copy_bytes_per_row(row_bytes);
         if row_bytes == aligned_row_bytes {
             capture_state

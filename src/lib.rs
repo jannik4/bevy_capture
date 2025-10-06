@@ -8,13 +8,11 @@ mod render_world;
 pub mod encoder;
 
 use bevy::{
+    asset::RenderAssetUsages,
+    camera::RenderTarget,
     image::BevyDefault,
     prelude::*,
-    render::{
-        camera::RenderTarget,
-        render_asset::RenderAssetUsages,
-        render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
-    },
+    render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
 };
 use std::sync::Mutex;
 use variadics_please::all_tuples;

@@ -73,7 +73,7 @@ fn setup(
 }
 
 fn update(
-    mut app_exit: EventWriter<AppExit>,
+    mut app_exit: MessageWriter<AppExit>,
     mut capture: Query<&mut Capture>,
     mut cubes: Query<&mut Transform, With<Cube>>,
     mut frame: Local<u32>,
