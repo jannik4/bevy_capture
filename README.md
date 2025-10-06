@@ -55,7 +55,13 @@ fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
 }
 
 // Start capturing
-fn update(mut capture: Query<&mut Capture>) {
+fn update(mut capture: Query<&mut Capture>, mut waited: Local<bool>) {
+  // Wait one frame: https://github.com/bevyengine/bevy/issues/20756
+  if !*waited {
+      *waited = true;
+      return;
+  }
+
   let mut capture = capture.single_mut().unwrap();
   if !capture.is_capturing() {
     capture.start(
