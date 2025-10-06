@@ -197,7 +197,7 @@ impl Mp4FfmpegCliPipeEncoder {
                 let reader = BufReader::new(stderr);
                 for line in reader.lines() {
                     match line {
-                        Ok(l) => bevy::log::info!("ffmpeg: {}", l),
+                        Ok(l) => bevy::log::debug!("ffmpeg: {}", l),
                         Err(e) => {
                             bevy::log::warn!("failed reading ffmpeg stderr: {}", e);
                             break;
