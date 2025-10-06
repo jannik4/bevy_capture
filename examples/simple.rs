@@ -77,7 +77,13 @@ fn update(
     mut capture: Query<&mut Capture>,
     mut cubes: Query<&mut Transform, With<Cube>>,
     mut frame: Local<u32>,
+    mut wait: Local<u32>,
 ) {
+    if *wait < 1 {
+        *wait += 1;
+        return;
+    }
+
     let mut capture = capture.single_mut().unwrap();
     if !capture.is_capturing() {
         capture.start((
