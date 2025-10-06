@@ -293,7 +293,7 @@ impl Encoder for Mp4FfmpegCliPipeEncoder {
 
         // Convert image to raw bytes and write to ffmpeg
         let raw_bytes = Self::image_to_raw_bytes(image)?;
-        stdin.write_all(&raw_bytes)?;
+        stdin.write_all(raw_bytes)?;
         stdin.flush()?;
 
         Ok(())
