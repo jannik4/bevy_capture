@@ -1,5 +1,6 @@
 use bevy::{
     app::{RunMode, ScheduleRunnerPlugin},
+    camera::RenderTarget,
     prelude::*,
     render::RenderPlugin,
     time::TimeUpdateStrategy,
@@ -7,7 +8,7 @@ use bevy::{
 };
 use bevy_capture::{
     encoder::{frames, gif, mp4_ffmpeg_cli, mp4_ffmpeg_cli_pipe, mp4_openh264},
-    CameraTargetHeadless, Capture, CaptureBundle,
+    Capture, CaptureBundle, RenderTargetHeadless,
 };
 use std::{f32::consts::TAU, fs, time::Duration};
 
@@ -61,7 +62,7 @@ fn setup(
 ) {
     commands.spawn((
         Camera2d,
-        Camera::default().target_headless(512, 512, &mut images),
+        RenderTarget::target_headless(512, 512, &mut images),
         CaptureBundle::default(),
     ));
 

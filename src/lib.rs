@@ -117,24 +117,24 @@ pub enum CaptureSource {
     Camera(Entity),
 }
 
-/// Extension trait for the camera to set the target to a headless image.
+/// Extension trait for the render target to set the target to a headless image.
 ///
 /// # Example
 /// ```ignore
-/// # use bevy::prelude::*;
-/// # use bevy_capture::CameraTargetHeadless;
+/// # use bevy::{prelude::*, camera::RenderTarget};
+/// # use bevy_capture::RenderTargetHeadless;
 /// #
 /// fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>) {
-///    commands.spawn((Camera2d, Camera::default().target_headless(512, 512, &mut images)));
+///    commands.spawn((Camera2d, RenderTarget::target_headless(512, 512, &mut images)));
 /// }
 /// ```
-pub trait CameraTargetHeadless {
-    /// Sets the target of the camera to a headless image with the given dimensions.
-    fn target_headless(self, width: u32, height: u32, images: &mut Assets<Image>) -> Self;
+pub trait RenderTargetHeadless {
+    /// Sets the render target to a headless image with the given dimensions.
+    fn target_headless(width: u32, height: u32, images: &mut Assets<Image>) -> Self;
 }
 
-impl CameraTargetHeadless for Camera {
-    fn target_headless(mut self, width: u32, height: u32, images: &mut Assets<Image>) -> Self {
+impl RenderTargetHeadless for RenderTarget {
+    fn target_headless(width: u32, height: u32, images: &mut Assets<Image>) -> Self {
         let mut image = Image::new_fill(
             Extent3d {
                 width,
@@ -150,9 +150,7 @@ impl CameraTargetHeadless for Camera {
             | TextureUsages::RENDER_ATTACHMENT
             | TextureUsages::TEXTURE_BINDING;
 
-        self.target = RenderTarget::Image(images.add(image).into());
-
-        self
+        RenderTarget::Image(images.add(image).into())
     }
 }
 

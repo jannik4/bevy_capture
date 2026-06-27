@@ -85,7 +85,7 @@ impl ExtractedCaptureState {
 fn extract_captures(
     mut captures: ResMut<Captures>,
     captures_query: Extract<Query<(Entity, &Capture, &CaptureSource)>>,
-    cameras_query: Extract<Query<&Camera>>,
+    render_targets_query: Extract<Query<&RenderTarget>>,
     images: Extract<Res<Assets<Image>>>,
     render_device: Res<RenderDevice>,
 ) {
@@ -106,13 +106,14 @@ fn extract_captures(
                     CaptureSource::ThisCamera => entity,
                     CaptureSource::Camera(entity) => *entity,
                 };
-                let source = cameras_query
-                    .get(camera_entity)
-                    .ok()
-                    .and_then(|camera| match &camera.target {
-                        RenderTarget::Image(image) => Some(image.clone()),
-                        _ => None,
-                    });
+                let source =
+                    render_targets_query
+                        .get(camera_entity)
+                        .ok()
+                        .and_then(|render_target| match render_target {
+                            RenderTarget::Image(image) => Some(image.clone()),
+                            _ => None,
+                        });
                 let source = match source {
                     Some(source) => source.handle,
                     None => {
@@ -225,7 +226,7 @@ fn encode(mut captures: ResMut<Captures>, render_device: Res<RenderDevice>) {
             Ok(r) => s.send(r).expect("Failed to send map update"),
             Err(err) => panic!("Failed to map buffer {err}"),
         });
-        let _ = render_device.poll(PollType::wait());
+        let _ = render_device.poll(PollType::wait_indefinitely());
         r.recv().expect("Failed to receive the map_async message");
 
         let buffer_bytes = buffer_slice.get_mapped_range().to_vec();

@@ -49,7 +49,7 @@ app.add_plugins((
 fn setup(mut commands: Commands, mut images: ResMut<Assets<Image>>) {
   commands.spawn((
       Camera2d,
-      Camera::default().target_headless(512, 512, &mut images),
+      RenderTarget::target_headless(512, 512, &mut images),
       CaptureBundle::default(),
   ));
 }
