@@ -10,7 +10,6 @@ pub mod encoder;
 use bevy::{
     asset::RenderAssetUsages,
     camera::RenderTarget,
-    image::BevyDefault,
     prelude::*,
     render::render_resource::{Extent3d, TextureDimension, TextureFormat, TextureUsages},
 };
@@ -143,7 +142,7 @@ impl RenderTargetHeadless for RenderTarget {
             },
             TextureDimension::D2,
             &[0; 4],
-            TextureFormat::bevy_default(),
+            TextureFormat::Rgba8UnormSrgb,
             RenderAssetUsages::default(),
         );
         image.texture_descriptor.usage |= TextureUsages::COPY_SRC

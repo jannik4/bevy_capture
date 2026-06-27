@@ -4,14 +4,12 @@ use bevy::{
     image::TextureFormatPixelInfo,
     prelude::*,
     render::{
-        graph::CameraDriverLabel,
         render_asset::RenderAssets,
-        render_graph::{self, NodeRunError, RenderGraph, RenderGraphContext, RenderLabel},
         render_resource::{
             Buffer, BufferDescriptor, BufferUsages, MapMode, PollType, TexelCopyBufferInfo,
             TexelCopyBufferLayout,
         },
-        renderer::{RenderContext, RenderDevice},
+        renderer::{RenderContext, RenderDevice, RenderGraphSystems},
         texture::GpuImage,
         Extract, Render, RenderApp, RenderSystems,
     },
@@ -27,11 +25,14 @@ impl Plugin for CaptureRenderWorldPlugin {
             .init_resource::<Captures>()
             .add_systems(ExtractSchedule, extract_captures);
 
-        let mut graph = render_app.world_mut().resource_mut::<RenderGraph>();
-        graph.add_node(ImageCopy, ImageCopyDriver);
-        graph.add_node_edge(CameraDriverLabel, ImageCopy);
-
-        render_app.add_systems(Render, encode.after(RenderSystems::Render));
+        render_app
+            .add_systems(
+                RenderGraph,
+                image_copy_pass
+                    .after(RenderGraphSystems::Render)
+                    .before(RenderGraphSystems::Submit),
+            )
+            .add_systems(Render, encode.after(RenderSystems::Render));
     }
 }
 
@@ -146,68 +147,57 @@ fn extract_captures(
         .collect();
 }
 
-#[derive(Debug, PartialEq, Eq, Clone, Hash, RenderLabel)]
-struct ImageCopy;
+fn image_copy_pass(mut render_context: RenderContext, world: &World) {
+    let captures = world.get_resource::<Captures>().unwrap();
+    let gpu_images = world.get_resource::<RenderAssets<GpuImage>>().unwrap();
 
-#[derive(Default)]
-struct ImageCopyDriver;
+    for capture in captures.captures.values() {
+        let capture_state = match &capture.state {
+            Some(state) if !capture.paused => state,
+            _ => continue,
+        };
 
-impl render_graph::Node for ImageCopyDriver {
-    fn run(
-        &self,
-        _graph: &mut RenderGraphContext,
-        render_context: &mut RenderContext,
-        world: &World,
-    ) -> Result<(), NodeRunError> {
-        let captures = world.get_resource::<Captures>().unwrap();
-        let gpu_images = world.get_resource::<RenderAssets<GpuImage>>().unwrap();
+        let src_image = gpu_images.get(&capture_state.source).unwrap();
 
-        for capture in captures.captures.values() {
-            let capture_state = match &capture.state {
-                Some(state) if !capture.paused => state,
-                _ => continue,
-            };
+        let encoder = render_context.command_encoder();
 
-            let src_image = gpu_images.get(&capture_state.source).unwrap();
+        let block_dimensions = src_image.texture_descriptor.format.block_dimensions();
+        let block_size = src_image
+            .texture_descriptor
+            .format
+            .block_copy_size(None)
+            .unwrap();
 
-            let encoder = render_context.command_encoder();
+        // Calculating correct size of image row because
+        // copy_texture_to_buffer can copy image only by rows aligned wgpu::COPY_BYTES_PER_ROW_ALIGNMENT
+        // That's why image in buffer can be little bit wider
+        // This should be taken into account at copy from buffer stage
+        let padded_bytes_per_row = RenderDevice::align_copy_bytes_per_row(
+            (src_image.size_2d().x as usize / block_dimensions.0 as usize) * block_size as usize,
+        );
 
-            let block_dimensions = src_image.texture_format.block_dimensions();
-            let block_size = src_image.texture_format.block_copy_size(None).unwrap();
+        let texture_extent = Extent3d {
+            width: src_image.size_2d().x,
+            height: src_image.size_2d().y,
+            depth_or_array_layers: 1,
+        };
 
-            // Calculating correct size of image row because
-            // copy_texture_to_buffer can copy image only by rows aligned wgpu::COPY_BYTES_PER_ROW_ALIGNMENT
-            // That's why image in buffer can be little bit wider
-            // This should be taken into account at copy from buffer stage
-            let padded_bytes_per_row = RenderDevice::align_copy_bytes_per_row(
-                (src_image.size.width as usize / block_dimensions.0 as usize) * block_size as usize,
-            );
-
-            let texture_extent = Extent3d {
-                width: src_image.size.width,
-                height: src_image.size.height,
-                depth_or_array_layers: 1,
-            };
-
-            encoder.copy_texture_to_buffer(
-                src_image.texture.as_image_copy(),
-                TexelCopyBufferInfo {
-                    buffer: &capture_state.target_buffer,
-                    layout: TexelCopyBufferLayout {
-                        offset: 0,
-                        bytes_per_row: Some(
-                            std::num::NonZeroU32::new(padded_bytes_per_row as u32)
-                                .unwrap()
-                                .into(),
-                        ),
-                        rows_per_image: None,
-                    },
+        encoder.copy_texture_to_buffer(
+            src_image.texture.as_image_copy(),
+            TexelCopyBufferInfo {
+                buffer: &capture_state.target_buffer,
+                layout: TexelCopyBufferLayout {
+                    offset: 0,
+                    bytes_per_row: Some(
+                        std::num::NonZeroU32::new(padded_bytes_per_row as u32)
+                            .unwrap()
+                            .into(),
+                    ),
+                    rows_per_image: None,
                 },
-                texture_extent,
-            );
-        }
-
-        Ok(())
+            },
+            texture_extent,
+        );
     }
 }
 
